@@ -64,9 +64,9 @@ class PelotonLastWorkout(BinarySensorEntity, CoordinatorEntity):  # type: ignore
             "manufacturer": "Peloton",
         }
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
-        await super().async_added_to_hass()
+    # async def async_added_to_hass(self) -> None:
+    #     """Register callbacks."""
+    #     await super().async_added_to_hass()
 
     @callback  # type: ignore
     def _handle_coordinator_update(self) -> None:
