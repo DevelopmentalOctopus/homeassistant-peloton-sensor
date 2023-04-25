@@ -223,7 +223,7 @@ def compile_quant_data(
                         if isinstance((avg_val := metric.get("average_value")), int)
                         else None,
                         int(val)
-                        if isinstance((val := metric.get("values")[len(metric.get("values"))-1]), int)
+                        if len(metric.get("values")) and isinstance((val := metric.get("values")[len(metric.get("values"))-1]), int)
                         else None,
                         str(metric.get("display_unit")),
                         None,
@@ -241,7 +241,7 @@ def compile_quant_data(
                         if isinstance((avg := metric.get("average_value")), int)
                         else None,
                         int(value)
-                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
+                        if len(metric.get("values")) and isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
                         else None,
                         "%",
                         None,
@@ -259,7 +259,7 @@ def compile_quant_data(
                         if isinstance((avg := metric.get("average_value")), float)
                         else None,
                        value
-                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), float)
+                        if len(metric.get("values")) and isinstance((value := metric.get("values")[len(metric.get("values"))-1]), float)
                         else None,
                         str(metric.get("display_unit")),
                         SensorDeviceClass.SPEED,
@@ -277,7 +277,7 @@ def compile_quant_data(
                         if isinstance((avg := metric.get("average_value")), float)
                         else None,
                         value
-                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), float)
+                        if len(metric.get("values")) and isinstance((value := metric.get("values")[len(metric.get("values"))-1]), float)
                         else None,
                         "%",
                         None,
@@ -295,7 +295,7 @@ def compile_quant_data(
                         if isinstance((avg := metric.get("average_value")), int)
                         else None,
                         int(value)
-                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
+                        if len(metric.get("values")) and isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
                         else None,
                         "rpm",
                         None,
@@ -313,7 +313,7 @@ def compile_quant_data(
                         if isinstance((avg := metric.get("average_value")), int)
                         else None,
                         int(value)
-                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
+                        if len(metric.get("values")) and isinstance((value := metric.get("values")[len(metric.get("values"))-1]), int)
                         else None,
                         "W",
                         SensorDeviceClass.POWER,
