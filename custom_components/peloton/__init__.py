@@ -100,14 +100,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         update_interval=timedelta(seconds=10),
     )
 
-    # Fetch initial data so we have data when entities subscribe
-    await coordinator.async_config_entry_first_refresh()
-
     # Load data for domain. If not present, initlaize dict for this domain.
     hass.data.setdefault(DOMAIN, {})
 
     # Store coordinator
     hass.data[DOMAIN][entry.entry_id] = coordinator
+
+    # Fetch initial data so we have data when entities subscribe
+    await coordinator.async_config_entry_first_refresh()
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 

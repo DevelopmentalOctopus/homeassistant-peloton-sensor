@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import logging
+import asyncio
 from typing import Any, Optional
 
 from homeassistant import core
@@ -16,6 +17,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity_platform import DiscoveryInfoType
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from homeassistant.helpers import entity_registry
 
 from .const import DOMAIN
 
@@ -37,7 +39,7 @@ class PelotonStat:
     icon: Optional[str] = None
     entity_category: Optional[EntityCategory] = None
     entity_registry_enabled_default: Optional[bool] = True
-    
+
 
 
 @dataclass
@@ -77,9 +79,11 @@ async def async_setup_entry(
 
     _LOGGER.debug("Creating Peloton binary sensors")
 
+    ent_reg = entity_registry.async_get(hass)
+
     async_add_entities(
         (
-            PelotonStatSensor(coordinator=coordinator, peloton_stat=peloton_stat)
+            PelotonStatSensor(coordinator=coordinator, peloton_stat=peloton_stat, ent_reg=ent_reg)
             for peloton_stat in coordinator.data.get("quant_data", [])
             if isinstance(peloton_stat, PelotonStat)
         ),
@@ -89,12 +93,13 @@ async def async_setup_entry(
 class PelotonStatSensor(SensorEntity, CoordinatorEntity):  # type: ignore
     """Quantative data sensor."""
 
-    def __init__(self, coordinator: DataUpdateCoordinator, peloton_stat: PelotonStat) -> None:
+    def __init__(self, coordinator: DataUpdateCoordinator, peloton_stat: PelotonStat, ent_reg: EntityRegistry) -> None:
         """Initialize quant stat sensor."""
         super().__init__(coordinator)
 
         self.stat_name = peloton_stat.name
         self.coordinator = coordinator
+        self.ent_reg = ent_reg
 
         user_id = coordinator.data.get("workout_stats_summary", {}).get("user_id")
 
@@ -108,9 +113,9 @@ class PelotonStatSensor(SensorEntity, CoordinatorEntity):  # type: ignore
 
         self._attr_entity_registry_enabled_default = peloton_stat.entity_registry_enabled_default
 
-    async def async_added_to_hass(self) -> None:
-        """Register callbacks."""
-        await super().async_added_to_hass()
+    # async def async_added_to_hass(self) -> None:
+    #     """Register callbacks."""
+    #     await super().async_added_to_hass()
 
     @callback  # type: ignore
     def _handle_coordinator_update(self) -> None:
@@ -128,5 +133,12 @@ class PelotonStatSensor(SensorEntity, CoordinatorEntity):  # type: ignore
 
                 if peloton_stat.icon:
                     self._attr_icon = peloton_stat.icon
+
+                if peloton_stat.native_value is None:  # TODO ever a desired value?
+                    if not self.registry_entry.hidden:
+                        self.ent_reg.async_update_entity(self.entity_id, hidden_by=entity_registry.RegistryEntryHider.INTEGRATION)
+                elif self.registry_entry.hidden:
+                    if self.registry_entry.hidden_by == entity_registry.RegistryEntryHider.INTEGRATION:
+                        self.ent_reg.async_update_entity(self.entity_id, hidden_by=None)
 
         self.async_write_ha_state()
