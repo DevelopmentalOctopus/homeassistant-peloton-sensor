@@ -211,7 +211,16 @@ def compile_quant_data(
 
     metric: dict
     metrics: dict = {}
+    metrics_flattened: list = []
+
     for metric in workout_stats_detail.get("metrics", []):
+        metrics_flattened.append(metric)
+        # Tread gives speed as an alternative to the "pace" stat.
+        alternatives = metric.get('alternatives', [])
+        if alternatives:
+            metrics_flattened.extend(alternatives)
+
+    for metric in metrics_flattened:
         if metric.get("slug") == "heart_rate":
             metrics.update(
                 {
