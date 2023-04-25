@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import logging
+import time
 
 from dateutil import tz
 from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
@@ -68,10 +69,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         workout_stats_summary_id = workout_stats_summary["id"]
         user_profile = await hass.async_add_executor_job(api.GetMe)
         user_settings = await hass.async_add_executor_job(api.GetSettings)
+
+        in_progress = workout_stats_summary.get("status", None) == "IN_PROGRESS"
+
+        stat_interval = 2 if in_progress else 300
+
+        hass.data[DOMAIN][entry.entry_id].update_interval = timedelta(seconds=2) if in_progress else timedelta(seconds=20)
+
         return {
             "workout_stats_detail": (
                 workout_stats_detail := await hass.async_add_executor_job(
-                    api.GetWorkoutMetricsById, workout_stats_summary_id
+                    api.GetWorkoutMetricsById, workout_stats_summary_id, stat_interval
                 )
             ),
             "workout_stats_summary": workout_stats_summary,
@@ -186,6 +194,18 @@ def compile_quant_data(
                     )
                 }
             )
+        if summary.get("slug") == "elevation":
+            summaries.update(
+                {
+                    "elevation": PelotonSummary(
+                        value
+                        if isinstance((value := summary.get("value")), int)
+                        else None,
+                        str(summary.get("display_unit")),
+                        None,
+                    )
+                }
+            )
 
     # Preprocess Metrics
 
@@ -243,6 +263,24 @@ def compile_quant_data(
                         else None,
                         str(metric.get("display_unit")),
                         SensorDeviceClass.SPEED,
+                    )
+                }
+            )
+        if metric.get("slug") == "incline":
+            metrics.update(
+                {
+                    "incline": PelotonMetric(
+                        max_val
+                        if isinstance((max_val := metric.get("max_value")), float)
+                        else None,
+                        avg
+                        if isinstance((avg := metric.get("average_value")), float)
+                        else None,
+                        value
+                        if isinstance((value := metric.get("values")[len(metric.get("values"))-1]), float)
+                        else None,
+                        "%",
+                        None,
                     )
                 }
             )
@@ -382,6 +420,25 @@ def compile_quant_data(
                     )
                 }
             )
+
+    target_metrics = workout_stats_detail.get('target_metrics_performance_data', {}).get('target_metrics', [])
+
+    actual_elapsed = round(time.time()) - workout_stats_summary.get("start_time", 0)  # TODO handle failure case.
+
+    for target in target_metrics:
+        if target['offsets']['end'] >= actual_elapsed >= target['offsets']['start']:
+            for metric in target['metrics']:
+                name = metric.get("name")
+                if name == 'speed':
+                    metrics['target_speed'] = {
+                        'upper': metric['upper'],
+                        'lower': metric['lower'],
+                    }
+                elif name == 'incline':
+                    metrics['target_incline'] = {
+                        'upper': metric['upper'],
+                        'lower': metric['lower'],
+                    }
 
     # Build and return list.
     return [
@@ -550,6 +607,62 @@ def compile_quant_data(
             getattr(metrics.get("speed"), "device_class", None),
             SensorStateClass.MEASUREMENT,
             "mdi:speedometer-slow",
+        ),
+        PelotonStat(
+            "Target Speed Upper",
+            metrics.get('target_speed', {}).get('upper', None),
+            UnitOfSpeed.MILES_PER_HOUR if distance_unit == "imperial" else UnitOfSpeed.KILOMETERS_PER_HOUR if distance_unit == 'metric' else None,
+            None,
+            SensorStateClass.MEASUREMENT,
+            "mdi:speedometer",
+        ),
+        PelotonStat(
+            "Target Speed Lower",
+            metrics.get('target_speed', {}).get('lower', None),
+            UnitOfSpeed.MILES_PER_HOUR if distance_unit == "imperial" else UnitOfSpeed.KILOMETERS_PER_HOUR if distance_unit == 'metric' else None,
+            None,
+            SensorStateClass.MEASUREMENT,
+            "mdi:speedometer-slow",
+        ),
+        PelotonStat(
+            "Incline: Average",
+            getattr(metrics.get("incline"), "avg_val", None),
+            "%",
+            getattr(metrics.get("incline"), "device_class", None),
+            SensorStateClass.MEASUREMENT,
+            "mdi:slope-uphill",
+        ),
+        PelotonStat(
+            "Incline: Max",
+            getattr(metrics.get("incline"), "max_val", None),
+            "%",
+            getattr(metrics.get("incline"), "device_class", None),
+            SensorStateClass.MEASUREMENT,
+            "mdi:slope-uphill",
+        ),
+        PelotonStat(
+            "Incline: Current",
+            getattr(metrics.get("incline"), "value", None),
+            "%",
+            getattr(metrics.get("incline"), "device_class", None),
+            SensorStateClass.MEASUREMENT,
+            "mdi:slope-uphill",
+        ),
+        PelotonStat(
+            "Target Incline Upper",
+            metrics.get('target_incline', {}).get('upper', None),
+            "%",
+            None,
+            SensorStateClass.MEASUREMENT,
+            "mdi:slope-uphill",
+        ),
+        PelotonStat(
+            "Target Incline Lower",
+            metrics.get('target_incline', {}).get('lower', None),
+            "%",
+            None,
+            SensorStateClass.MEASUREMENT,
+            "mdi:slope-downhill",
         ),
         PelotonStat(
             "Cadence: Average",
